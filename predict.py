@@ -5,7 +5,6 @@ import os
 
 app = Flask(__name__)
 
-# Load model
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(BASE_DIR, 'model.pkl')
 
@@ -21,7 +20,6 @@ def predict():
     try:
         req = request.get_json()
 
-        # Validasi input
         if not req:
             return jsonify({"error": "Request kosong"}), 400
 
@@ -30,28 +28,24 @@ def predict():
 
         df = pd.DataFrame(req)
 
-        # Pastikan ada kolom Description
         if 'Description' not in df.columns:
             df['Description'] = 'Unknown'
 
-        # Cek fitur
-        missing_cols = [col for col in fitur if col not in df.columns]
+        missing_cols = [c for c in fitur if c not in df.columns]
         if missing_cols:
             return jsonify({
                 "error": "Kolom kurang",
                 "missing": missing_cols
             }), 400
 
-        # Convert numeric
-        for col in fitur:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+        for c in fitur:
+            df[c] = pd.to_numeric(df[c], errors='coerce')
 
         if df[fitur].isnull().any().any():
             return jsonify({
                 "error": "Ada nilai tidak valid"
             }), 400
 
-        # Prediksi
         preds = model.predict(df[fitur])
 
         df_result = pd.DataFrame({
@@ -59,20 +53,23 @@ def predict():
             'prediction': preds
         })
 
-        # Ambil TOP PRODUK
-        hasil = (
+        total_prediction = float(df_result['prediction'].sum())
+
+        top = (
             df_result
             .groupby('Description')['prediction']
             .sum()
             .sort_values(ascending=False)
-            .head(5)
         )
 
+        top_product = top.index[0] if len(top) > 0 else "Unknown"
+
         return jsonify({
-            "top_product": hasil.index[0],
+            "prediction": total_prediction,   # ⭐ INI YANG DIPAKAI LARAVEL
+            "top_product": top_product,
             "chart": [
                 {"product": k, "qty": float(v)}
-                for k, v in hasil.items()
+                for k, v in top.items()
             ]
         })
 
